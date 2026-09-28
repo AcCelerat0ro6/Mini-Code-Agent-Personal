@@ -1,0 +1,709 @@
+<tool_call>
+<function=write_file>
+<parameter=path>G:\GoCode\LearnCCPersonal\game.py</parameter>
+<parameter=content>#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+╔══════════════════════════════════════════════════════════════╗
+║         🌸 学园祭前夜 ~Starlight Festival Eve~ 🌟           ║
+║              A CLI-based Visual Novel / Galgame             ║
+║                    Python Terminal Demo                     ║
+╚══════════════════════════════════════════════════════════════╝
+"""
+
+import sys
+import time
+import os
+import random
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║                    COLOR UTILITIES                          ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+class Color:
+    """ANSI Color codes for terminal output."""
+    # Reset
+    RESET       = "\033[0m"
+
+    # Regular colors
+    BLACK       = "\033[30m"
+    RED         = "\033[31m"
+    GREEN       = "\033[32m"
+    YELLOW      = "\033[33m"
+    BLUE        = "\033[34m"
+    MAGENTA     = "\033[35m"
+    CYAN        = "\033[36m"
+    WHITE       = "\033[37m"
+
+    # Bright colors
+    BRIGHT_RED     = "\033[91m"
+    BRIGHT_GREEN   = "\033[92m"
+    BRIGHT_YELLOW  = "\033[93m"
+    BRIGHT_BLUE    = "\033[94m"
+    BRIGHT_MAGENTA = "\033[95m"
+    BRIGHT_CYAN    = "\033[96m"
+    BRIGHT_WHITE   = "\033[97m"
+
+    # Background colors
+    BG_BLACK    = "\033[40m"
+    BG_RED      = "\033[41m"
+    BG_GREEN    = "\033[42m"
+    BG_YELLOW   = "\033[43m"
+    BG_BLUE     = "\033[44m"
+    BG_MAGENTA  = "\033[45m"
+    BG_CYAN     = "\033[46m"
+    BG_WHITE    = "\033[47m"
+
+    # Styles
+    BOLD        = "\033[1m"
+    DIM         = "\033[2m"
+    ITALIC      = "\033[3m"
+    UNDERLINE   = "\033[4m"
+    BLINK       = "\033[5m"
+    REVERSE     = "\033[7m"
+
+    @staticmethod
+    def rgb_fg(r: int, g: int, b: int) -> str:
+        """Set foreground color using 256 RGB values."""
+        return f"\033[38;2;{r};{g};{b}m"
+
+    @staticmethod
+    def rgb_bg(r: int, g: int, b: int) -> str:
+        """Set background color using 256 RGB values."""
+        return f"\033[48;2;{r};{g};{b}m"
+
+
+def clear_screen():
+    """Clear the terminal screen."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+
+def colored_text(text: str, color: str) -> str:
+    """Wrap text with color codes."""
+    return f"{color}{text}{Color.RESET}"
+
+
+def print_divider(char: str = "═", length: int = 60, color: str = Color.CYAN):
+    """Print a decorative divider line."""
+    print(colored_text(char * length, color))
+
+
+def print_centered(text: str, color: str = Color.WHITE, width: int = 60):
+    """Print centered colored text."""
+    lines = text.split('\n')
+    for line in lines:
+        padding = max(0, (width - len(line)) // 2)
+        print(" " * padding + colored_text(line, color))
+
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║                  TYPEWRITER EFFECT                          ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+def typewriter(text: str, color: str = Color.WHITE,
+               speed: float = 0.035, pause_at_end: float = 0.8):
+    """
+    Display text with a typewriter effect.
+    
+    Args:
+        text: The text to display character by character.
+        color: ANSI color code for the text.
+        speed: Delay between each character in seconds.
+        pause_at_end: Pause after the full text is displayed.
+    """
+    colored = False
+    i = 0
+    while i < len(text):
+        char = text[i]
+        # Handle color escape codes - print them instantly without delay
+        if char == '\033':
+            # Find the end of the ANSI escape code
+            code_end = text.find('m', i)
+            if code_end != -1:
+                sys.stdout.write(text[i:code_end + 1])
+                i = code_end + 1
+                continue
+        # Handle regular newline
+        if char == '\n':
+            sys.stdout.write('\n')
+            sys.stdout.flush()
+            i += 1
+            continue
+        # Normal character - type with delay
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(speed)
+        i += 1
+    
+    sys.stdout.flush()
+    if pause_at_end > 0:
+        time.sleep(pause_at_end)
+
+
+def typewriter_slow(text: str, color: str = Color.WHITE):
+    """Slower typewriter for dramatic moments."""
+    typewriter(text, color, speed=0.06, pause_at_end=1.2)
+
+
+def typewriter_fast(text: str, color: str = Color.WHITE):
+    """Faster typewriter for urgent/excited dialogue."""
+    typewriter(text, color, speed=0.015, pause_at_end=0.5)
+
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║               ASCII ART CHARACTER PORTRAITS                 ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+CHARACTER_PORTRAITS = {
+    "yukiko": [
+        r"              ,;;:,              ",
+        r"          ,;;::::;;,            ",
+        r"        ,;:''  ~~  '';;,        ",
+        r"      ,;'  ╭──────╮  ';,       ",
+        r"     /;  ╭─┤ (◕‿◕) ├─╮  ;\     ",
+        r"    |;  │  ╰──┬─┬──╯  │  ;|    ",
+        r"    |;  │    ╭┴─┴╮    │  ;|    ",
+        r"     \;  ╰───┤ ◡ ├───╯  ;/     ",
+        r"      ';,  ╰──────╯  ,;'       ",
+        r"       ';;,_      _,;;'         ",
+        r"     ~~~~';'~~~~';'~~~~         ",
+        r"    ╱  ╱  │    │  ╲  ╲        ",
+        r"   ╱  ╱   │    │   ╲  ╲       ",
+        r"  '──'    '────'    '──'       ",
+        r"  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓   ",
+    ],
+    "yukiko_blush": [
+        r"              ,;;:,              ",
+        r"          ,;;::::;;,            ",
+        r"        ,;:''  ~~  '';;,        ",
+        r"      ,;'  ╭──────╮  ';,       ",
+        r"     /;  ╭─┤ (◕‿◕) ├─╮  ;\     ",
+        r"    |;  │  ╰──┬─┬──╯  │  ;|    ",
+        r"    |;  │  ⌒ ╭┴─┴╮ ⌒  │  ;|    ",
+        r"     \;  ╰───┤ ᴗ ├───╯  ;/     ",
+        r"      ';,  ╰──────╯  ,;'       ",
+        r"       ';;,_      _,;;'         ",
+        r"     ~~~~';'~~~~';'~~~~         ",
+        r"    ╱  ╱  │    │  ╲  ╲        ",
+        r"   ╱  ╱   │    │   ╲  ╲       ",
+        r"  '──'    '────'    '──'       ",
+        r"  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓   ",
+    ],
+    "ami": [
+        r"          *  . *   * .  *       ",
+        r"        ·  ★  · *  ·  ★  ·     ",
+        r"       ╱╲ ╱╲╱╲ ╱╲╱╲ ╱╲        ",
+        r"      ╱◇◇╲    ╭───╮   ╱◇◇╲    ",
+        r"     ╱◇◇◇◇╲ ╭┤(^▽^)├╮ ╱◇◇◇╲   ",
+        r"     │ ◇◇◇ ││ ╰─┬─╯ ││◇◇◇ │   ",
+        r"     │  ◇◇ ││   │   ││ ◇◇  │   ",
+        r"      ╲◇◇╱ ╰┤  ╰─╯  ├╯ ╲◇◇╱    ",
+        r"       ╲╱   ╰───────╯   ╲╱     ",
+        r"        │   ╱  ‿‿‿‿  ╲   │     ",
+        r"        │  ╱  │    │  ╲  │     ",
+        r"        │ ╱   │    │   ╲ │     ",
+        r"       ╱ ╱    │    │    ╲ ╲     ",
+        r"      ╱╱      '────'     ╲╲    ",
+        r"     ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ",
+    ],
+    "ami_excited": [
+        r"          ★  ! ★   ! ★  !       ",
+        r"        ·  ★  · *  ·  ★  ·     ",
+        r"       ╱╲ ╱╲╱╲ ╱╲╱╲ ╱╲        ",
+        r"      ╱◇◇╲    ╭───╮   ╱◇◇╲    ",
+        r"     ╱◇◇◇◇╲ ╭┤(★▽★)├╮ ╱◇◇◇╲   ",
+        r"     │ ◇◇◇ ││ ╰─┬─╯ ││◇◇◇ │   ",
+        r"     │  ◇◇ ││ ╭─┴─╮ ││ ◇◇  │   ",
+        r"      ╲◇◇╱ ╰┤ │▽▽▽│ ├╯ ╲◇◇╱    ",
+        r"       ╲╱   ╰─│─────│─╯   ╲╱     ",
+        r"        │   ╱  ‿‿‿‿  ╲   │     ",
+        r"        │  ╱  │    │  ╲  │     ",
+        r"        │ ╱   │    │   ╲ │     ",
+        r"       ╱ ╱    │    │    ╲ ╲     ",
+        r"      ╱╱      '────'     ╲╲    ",
+        r"     ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ",
+    ],
+    "amamiya": [
+        r"      ～ ═══════════════ ～     ",
+        r"    ╱╲  ╱╲  ╱╲  ╱╲  ╱╲  ╱╲    ",
+        r"   ╱░░╲╱░░╲╱──╲╱░░╲╱░░╲╱░╲   ",
+        r"  │░░░░░░░░╭─────╮░░░░░░░░│   ",
+        r"  │░░░░░░╭┤(ー_ー)├╮░░░░░░│   ",
+        r"  │░░░░░░│╰──┬┬──╯│░░░░░░│   ",
+        r"  │░░░░░░│   ││   │░░░░░░│   ",
+        r"   ╲░░░░░╰┤  ╰╯  ├╯░░░░░╱    ",
+        r"    ╲░░░░░╰──────╯░░░░░╱     ",
+        r"     ～│ ╱  ～～～  ╲ │～      ",
+        r"       │╱  │     │  ╲│       ",
+        r"       │   │     │   │       ",
+        r"      ╱ ╲  │     │  ╱ ╲      ",
+        r"     ╱   ╲ '─────' ╱   ╲     ",
+        r"    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓   ",
+    ],
+    "amamiya_smile": [
+        r"      ～ ═══════════════ ～     ",
+        r"    ╱╲  ╱╲  ╱╲  ╱╲  ╱╲  ╱╲    ",
+        r"   ╱░░╲╱░░╲╱──╲╱░░╲╱░░╲╱░╲   ",
+        r"  │░░░░░░░░╭─────╮░░░░░░░░│   ",
+        r"  │░░░░░░╭┤(ー‿ー)├╮░░░░░░│   ",
+        r"  │░░░░░░│╰──┬┬──╯│░░░░░░│   ",
+        r"  │░░░░░░│  ◠││◠  │░░░░░░│   ",
+        r"   ╲░░░░░╰┤  ╰╯  ├╯░░░░░╱    ",
+        r"    ╲░░░░░╰──────╯░░░░░╱     ",
+        r"     ～│ ╱  ～～～  ╲ │～      ",
+        r"       │╱  │     │  ╲│       ",
+        r"       │   │     │   │       ",
+        r"      ╱ ╲  │     │  ╱ ╲      ",
+        r"     ╱   ╲ '─────' ╱   ╲     ",
+        r"    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓   ",
+    ],
+}
+
+
+def display_portrait(character_id: str, variant: str = None,
+                     color: str = Color.WHITE):
+    """
+    Display an ASCII art portrait for a character.
+    
+    Args:
+        character_id: The character's identifier.
+        variant: Optional portrait variant (e.g., 'blush', 'smile').
+        color: Color to render the portrait.
+    """
+    key = character_id if variant is None else f"{character_id}_{variant}"
+    portrait = CHARACTER_PORTRAITS.get(key, CHARACTER_PORTRAITS.get(character_id, []))
+    
+    if not portrait:
+        return
+    
+    # Calculate max line width for frame
+    max_width = max(len(line) for line in portrait)
+    
+    # Print framed portrait
+    print(colored_text(f"  ┌{'─' * (max_width + 2)}┐", color))
+    for line in portrait:
+        padding = max_width - len(line)
+        print(colored_text(f"  │ {line}{' ' * padding} │", color))
+    print(colored_text(f"  └{'─' * (max_width + 2)}┘", color))
+
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║                    CHARACTER CLASS                           ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+class Character:
+    """
+    Represents a game character with display info and dialogue capabilities.
+    
+    Attributes:
+        char_id:     Unique identifier for the character.
+        name_jp:     Japanese name display.
+        name_en:     English name display.
+        title:       Character's title/role.
+        color:       ANSI color code for name display.
+        portrait_id: Key into CHARACTER_PORTRAITS dict.
+        affection:   Current affection level with the player.
+    """
+    
+    def __init__(self, char_id: str, name_jp: str, name_en: str,
+                 title: str, color: str, portrait_id: str = None):
+        self.char_id = char_id
+        self.name_jp = name_jp
+        self.name_en = name_en
+        self.title = title
+        self.color = color
+        self.portrait_id = portrait_id or char_id
+        self.affection = 0  # 0 ~ 100
+    
+    def speak(self, text: str, variant: str = None,
+              speed: float = 0.035, show_portrait: bool = True):
+        """
+        Character speaks with portrait, name tag, and typewriter effect.
+        
+        Args:
+            text: The dialogue text.
+            variant: Optional portrait variant.
+            speed: Typewriter speed.
+            show_portrait: Whether to display the ASCII portrait.
+        """
+        if show_portrait:
+            display_portrait(self.portrait_id, variant, self.color)
+        
+        name_display = f"{colored_text(self.name_jp, self.color + Color.BOLD)}"
+        subtitle = colored_text(f"「{self.title}」", self.color + Color.DIM)
+        
+        print(f"  {name_display} {subtitle}")
+        print(colored_text("  " + "─" * 50, self.color + Color.DIM))
+        
+        # Build the full display string with inline color
+        dialogue = f"  {self.color}{text}{Color.RESET}"
+        typewriter(dialogue, self.color, speed=speed)
+        
+        if show_portrait:
+            print()  # spacing after portrait block
+    
+    def change_affection(self, amount: int, reason: str = ""):
+        """Change affection level, clamped to 0-100."""
+        old = self.affection
+        self.affection = max(0, min(100, self.affection + amount))
+        delta = self.affection - old
+        
+        if delta > 0:
+            indicator = colored_text(f"  ♥ 好感度 +{delta} ({self.name_en})", Color.BRIGHT_RED)
+        elif delta < 0:
+            indicator = colored_text(f"  ✗ 好感度 {delta} ({self.name_en})", Color.BRIGHT_BLUE)
+        else:
+            return
+        
+        if reason:
+            indicator += colored_text(f" — {reason}", Color.DIM)
+        print(indicator)
+        time.sleep(0.6)
+
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║                   STORY DATA STRUCTURES                     ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+class DialogueNode:
+    """
+    A single dialogue beat within a scene.
+    
+    Types:
+        - "narration"  : Narrator text (no character speaking)
+        - "speak"      : A character speaks
+        - "choice"     : Player makes a choice
+        - "effect"     : Trigger a game effect (affection change, etc.)
+        - "clear"      : Clear the screen
+        - "portrait"   : Show a character portrait with variant
+        - "scene_bg"   : Change scene background description
+        - "ending"     : Trigger an ending sequence
+    """
+    
+    def __init__(self, node_type: str, **kwargs):
+        self.node_type = node_type
+        self.data = kwargs
+    
+    def __repr__(self):
+        return f"DialogueNode({self.node_type}, {self.data})"
+
+
+class Choice:
+    """
+    A player choice with text and resulting next node.
+    
+    Attributes:
+        text:      The choice text displayed to the player.
+        next_node: The scene node key to jump to if selected.
+        effects:   List of (Character, int) affection changes.
+    """
+    
+    def __init__(self, text: str, next_node: str,
+                 effects: list = None):
+        self.text = text
+        self.next_node = next_node
+        self.effects = effects or []  # [(character, delta), ...]
+
+
+class SceneNode:
+    """
+    A node in the story graph. Contains a sequence of dialogue beats
+    and optionally choices that branch to other SceneNodes.
+    
+    Attributes:
+        key:        Unique key for this node.
+        dialogue:   List of DialogueNode objects.
+        choices:    List of Choice objects (empty = auto-advance).
+        next_node:  Key of next node if no choices (auto-advance).
+    """
+    
+    def __init__(self, key: str, dialogue: list = None,
+                 choices: list = None, next_node: str = None):
+        self.key = key
+        self.dialogue = dialogue or []
+        self.choices = choices or []
+        self.next_node = next_node
+
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║                  GAME ENGINE CLASS                           ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+class GameEngine:
+    """
+    Main game engine that manages scenes, characters, state,
+    and the core game loop.
+    """
+    
+    def __init__(self):
+        # Initialize characters
+        self.characters = {
+            "yukiko": Character(
+                "yukiko", "小雪", "Yukiko",
+                "图书委员 · 害羞的文学少女",
+                Color.BRIGHT_MAGENTA, "yukiko"
+            ),
+            "ami": Character(
+                "ami", "亚美", "Ami",
+                "学生会长 · 元气满满",
+                Color.BRIGHT_YELLOW, "ami"
+            ),
+            "amamiya": Character(
+                "amamiya", "雨宫", "Amamiya",
+                "转学生 · 银发的神秘人",
+                Color.BRIGHT_CYAN, "amamiya"
+            ),
+        }
+        
+        # Story state
+        self.current_node_key: str = "intro"
+        self.visited_nodes: set = set()
+        self.game_flags: dict = {}
+        self.story_data: dict = {}
+        
+        # Build the story
+        self._build_story()
+    
+    def _build_story(self):
+        """Construct the complete story graph."""
+        
+        self.story_data = {
+            # ─────────────────────────────────────
+            #  ACT 0: INTRODUCTION
+            # ─────────────────────────────────────
+            "intro": SceneNode(
+                key="intro",
+                dialogue=[
+                    DialogueNode("clear"),
+                    DialogueNode("scene_bg",
+                                 text="九月的晚风轻轻吹过�的走廊..."),
+                    DialogueNode("narration",
+                                 text="放学后的校舍，走廊被夕阳染成了温暖的橘红色。"),
+                    DialogueNode("narration",
+                                 text="明天就是一年一度的学园祭了。"),
+                    DialogueNode("narration",
+                                 text="整个校园弥漫着准备活动的忙碌与兴奋气息。"),
+                    DialogueNode("narration",
+                                 text="而你——作为班级的活动负责人，被留下来做最后的确认工作。"),
+                    DialogueNode("narration",
+                                 text="「终于检查完了……」"),
+                    DialogueNode("narration",
+                                 text="你合上检查清单，望向窗外渐渐暗下去的天空。"),
+                    DialogueNode("clear"),
+                    DialogueNode("narration",
+                                 text="走出教室时，你注意到走廊尽头似乎有人影在晃动。"),
+                ],
+                choices=[
+                    Choice("走向图书室方向（左侧走廊）", "yukiko_1",
+                           []),
+                    Choice("前往学生会办公室方向（右侧走廊）", "ami_1",
+                           []),
+                    Choice("悄悄走向通往天台的楼梯", "amamiya_1",
+                           []),
+                ]
+            ),
+            
+            # ─────────────────────────────────────
+            #  ACT 1-A: YUKIKO'S ROUTE
+            # ─────────────────────────────────────
+            "yukiko_1": SceneNode(
+                key="yukiko_1",
+                dialogue=[
+                    DialogueNode("clear"),
+                    DialogueNode("scene_bg",
+                                 text="图书室前 · 黄昏的光线从窗户倾泻而入"),
+                    DialogueNode("narration",
+                                 text="你沿着走廊走向图书室的方向。"),
+                    DialogueNode("narration",
+                                 text="远远地，就看到一个纤细的身影站在图书室门口。"),
+                    DialogueNode("narration",
+                                 text="深色的长发在夕阳下泛着柔和的光泽。"),
+                    DialogueNode("narration",
+                                 text="是图书委员——小雪。"),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「啊……你、你怎么来了？学园祭的准备工作不是结束了吗？」",
+                                 variant=None),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「我、我只是在整理明天要用的书签材料……不是特意留下来的……」",
+                                 variant="blush"),
+                    DialogueNode("narration",
+                                 text="她怀里抱着一叠彩色的纸张，脸颊微微泛红。"),
+                ],
+                choices=[
+                    Choice("「需要帮忙吗？我可以留下来帮你。」",
+                            "yukiko_2_help",
+                            [("yukiko", 10)]),
+                    Choice("「小雪，你一个人在这里不害怕吗？」",
+                            "yukiko_2_worry",
+                            [("yukiko", 5)]),
+                    Choice("「那我先走了，明天见。」",
+                            "yukiko_2_leave",
+                            [("yukiko", -5)]),
+                ]
+            ),
+            
+            "yukiko_2_help": SceneNode(
+                key="yukiko_2_help",
+                dialogue=[
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「诶？！你、你愿意帮我吗？」",
+                                 variant="blush"),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「不、不用那么麻烦你的……不过，如果你真的不介意的话……」",
+                                 variant="blush"),
+                    DialogueNode("narration",
+                                 text="她的声音越来越小，但眼中却闪过一丝欣喜。"),
+                    DialogueNode("clear"),
+                    DialogueNode("scene_bg",
+                                 text="图书室内 · 夕阳透过书架间的缝隙洒下斑驳的光影"),
+                    DialogueNode("narration",
+                                 text="你们并肩坐在图书室的长桌前，一起裁剪着学园祭用的装饰书签。"),
+                    DialogueNode("narration",
+                                 text="安静的图书室里，只有纸张沙沙作响的声音。"),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「其实……我很喜欢这样的时刻。安安静静的，有重要的人在身边……」",
+                                 variant=None),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「不、不是那个意思！我是说……就是、就是一起做事的伙伴……」",
+                                 variant="blush"),
+                    DialogueNode("narration",
+                                 text="她慌忙摆手，长长的黑发随着动作轻轻摆动。"),
+                    DialogueNode("narration",
+                                 text="你不禁笑了起来。"),
+                ],
+                choices=[
+                    Choice("「小雪，其实我也很喜欢和你在一起。」",
+                            "yukiko_3_confess",
+                            [("yukiko", 15)]),
+                    Choice("「这些书签做得真好看，都是小雪设计的吗？」",
+                            "yukiko_3_bookmark",
+                            [("yukiko", 8)]),
+                ]
+            ),
+            
+            "yukiko_2_worry": SceneNode(
+                key="yukiko_2_worry",
+                dialogue=[
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「害、害怕？不、不会啦……图书室的灯还亮着呢……」",
+                                 variant=None),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「不过……说实话，天黑以后一个人待在这里，确实有点……」",
+                                 variant="blush"),
+                    DialogueNode("narration",
+                                 text="她偷偷看了你一眼，又迅速低下头。"),
+                    DialogueNode("narration",
+                                 text="你注意到她微微攥紧了手中的材料。"),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「如果你……如果你也不急着回去的话，能陪我一会儿吗？」",
+                                 variant="blush"),
+                    DialogueNode("narration",
+                                 text="夕阳将她白皙的脸庞映得通红。"),
+                ],
+                choices=[
+                    Choice("「当然了，我陪你。」",
+                            "yukiko_3_stay",
+                            [("yukiko", 12)]),
+                    Choice("「要不我们换个亮堂点的地方？」",
+                            "yukiko_3_bright",
+                            [("yukiko", 5)]),
+                ]
+            ),
+            
+            "yukiko_2_leave": SceneNode(
+                key="yukiko_2_leave",
+                dialogue=[
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「啊……嗯，好的。明天见……」",
+                                 variant=None),
+                    DialogueNode("narration",
+                                 text="她的声音很轻，像是要被风吹散。"),
+                    DialogueNode("narration",
+                                 text="你走出几步后，隐约听到身后传来一声轻叹。"),
+                    DialogueNode("narration",
+                                 text="「……果然，还是太不起眼了吗……」"),
+                    DialogueNode("narration",
+                         text="你犹豫了一下，最终还是转身离开了。"),
+                    DialogueNode("narration",
+                         text="夜风从走廊的窗口灌进来，带着一丝凉意。"),
+                ],
+                next_node="day2_morning"
+            ),
+            
+            # Yukiko route - branching conclusions
+            "yukiko_3_confess": SceneNode(
+                key="yukiko_3_confess",
+                dialogue=[
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「……！！」",
+                                 variant="blush"),
+                    DialogueNode("narration",
+                                 text="她的脸瞬间红到了耳根，手中的剪刀差点掉在地上。"),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「你、你在说什么呢！突然就……我、我……」",
+                                 variant="blush"),
+                    DialogueNode("narration",
+                                 text="她低着头，手指不自觉地绞着衣角。"),
+                    DialogueNode("narration",
+                                 text="沉默了好一会儿——"),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「……我也是。和你在一起的时候，会觉得很安心。」",
+                                 variant="blush"),
+                    DialogueNode("narration",
+                                 text="她的声音几乎细不可闻，但你确确实实听到了。"),
+                    DialogueNode("narration",
+                                 text="夕阳西沉，图书室被笼罩在一片温柔的暮色中。"),
+                ],
+                next_node="ending_yukiko"
+            ),
+            
+            "yukiko_3_bookmark": SceneNode(
+                key="yukiko_3_bookmark",
+                dialogue=[
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「嗯……这些书签是我自己设计的。」",
+                                 variant=None),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「每一张都夹着一句我很喜欢的诗……」",
+                                 variant=None),
+                    DialogueNode("narration",
+                                 text="她递给你一张淡紫色的书签。"),
+                    DialogueNode("narration",
+                                 text="上面用工整的字迹写着："),
+                    DialogueNode("narration",
+                                 text="    「若你是我书中的一页，我愿用一生的时间，慢慢翻阅。」"),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「这、这张就送给你吧……明天学园祭的时候，记得来图书室看看哦。」",
+                                 variant="blush"),
+                ],
+                next_node="day2_morning"
+            ),
+            
+            "yukiko_3_stay": SceneNode(
+                key="yukiko_3_stay",
+                dialogue=[
+                    DialogueNode("narration",
+                                 text="你拉过一把椅子，在她身旁坐了下来。"),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「谢谢你……」",
+                                 variant=None),
+                    DialogueNode("narration",
+                                 text="她轻声道谢，嘴角露出一个温柔的微笑。"),
+                    DialogueNode("narration",
+                                 text="图书室里很安静，只有墙上的时钟发出滴答滴答的声响。"),
+                    DialogueNode("narration",
+                                 text="你们各自做着手中的事情，偶尔聊上几句。"),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「你有没有读过《挪威的森林》？我最喜欢里面的一句话……」",
+                                 variant=None),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「'死并非生的对立面，而是作为生的一部分永存。'」",
+                                 variant=None),
+                    DialogueNode("speak", char_id="yukiko",
+                                 text="「虽然听起来有点沉重……但我觉得，正因为知道了离别，才更珍惜现在在一起的时光。」",
+                                 variant=None),
+                ],
+                next_node="day2_morning"
+            ),
+            
+            "yukiko_3_bright": SceneNode(

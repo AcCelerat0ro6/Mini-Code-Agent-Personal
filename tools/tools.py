@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import subprocess
 from tools.todomanager import run_todo_write
+from tools.backgroundmanager import should_run_background, start_background_task
 from hooks.hook import trigger_hooks
 WORKDIR = os.getenv("WORK_DIR", Path.cwd())
 
@@ -21,8 +22,12 @@ def safe_path(p: str) -> Path:
         raise ValueError(f"Path escapes workspace: {p}")
     return path
 
-def run_bash(command: str) -> str:
-    """在工作区目录下执行 Bash 命令，带有简易危险命令黑名单过滤。"""
+def run_bash(command: str, run_in_background: bool = False) -> str:
+    """
+    在工作区目录下执行 Bash 命令，带有简易危险命令黑名单过滤。
+    run_in_background 是可选异步开关：真正的后台路由在 execute_tool 中完成，
+    此处保留参数仅为兼容工具 schema 的完整入参（同步路径会忽略它）。
+    """
     # 基础安全防护：拦截常见的高危破坏性指令
     dangerous = ["rm -rf /", "sudo", "shutdown", "reboot", "> /dev/"]
     if any(d in command for d in dangerous):
@@ -109,6 +114,10 @@ BASE_TOOLS = [
             "command": {
                 "type": "string",
                 "description": "The bash command to execute."
+            },
+            "run_in_background": {
+                "type": "boolean",
+                "description": "Optional async switch: set true to run the command in the background. The tool returns a task id immediately and the result is collected on a later turn. Only for independent commands."
             }
         },
         "required": ["command"]
@@ -239,16 +248,29 @@ def execute_tool(block, handlers: dict) -> str:
     统一的工具执行包装器：
     依次调度 PreToolUse 钩子 -> 执行实际函数 -> 调度 PostToolUse 钩子。
     若被前置钩子拦截，则直接短路返回拒绝信息。
+    bash 工具带 run_in_background=True 时走可选异步调用：
+    改由后台任务管理器执行并立即返回任务 ID，结果留待后续轮次回收。
     """
     blocked = trigger_hooks("PreToolUse", block)
     if blocked:
         return str(blocked)
 
-    handler = handlers.get(block.name)
-    try:
-        output = handler(**block.input) if handler else f"Unknown: {block.name}"
-    except Exception as e:
-        output = f"Error: {e}"
+    # 可选异步调用分支：后台执行不阻塞智能体循环，只回执任务 ID
+    if should_run_background(block.name, block.input):
+        try:
+            task_id = start_background_task(block)
+            output = (
+                f"[Background task {task_id} started] "
+                "The result will be collected on a later turn."
+            )
+        except Exception as e:
+            output = f"Error: {e}"
+    else:
+        handler = handlers.get(block.name)
+        try:
+            output = handler(**block.input) if handler else f"Unknown: {block.name}"
+        except Exception as e:
+            output = f"Error: {e}"
 
     trigger_hooks("PostToolUse", block, output)
     return str(output)

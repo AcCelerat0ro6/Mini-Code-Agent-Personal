@@ -1,0 +1,3 @@
+- [indentation_preference](indentation_preference.md) - The user's preferred method for code indentation, which should be remembered for future sessions.
+- [multi_agent_collaboration_preference](multi_agent_collaboration_preference.md) - The user expresses a preference for task completion through explicit multi-agent collaboration and division of labor.
+- [project_folder_creation_pattern](project_folder_creation_pattern.md) - The user's pattern of initiating a new project by requesting the creation of a specifically named directory in the current working directory.

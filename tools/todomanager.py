@@ -1,9 +1,12 @@
+import ast
 import json
 from anthropic import Anthropic
 class TodoManager:
     """管理 Agent 的待办任务清单，负责输入校验与文本可视化渲染"""
 
-    def __init__(self):
+    def __init__(self, label: str = "main"):
+        # 所属 Agent 标识（main/sub），终端输出时用于区分父子代理的清单
+        self.label = label
         self.items: list[dict] = []
 
     def update(self, todos: list | str) -> str:
@@ -65,16 +68,42 @@ class TodoManager:
         lines.append(f"\n({done}/{len(self.items)} completed)")
         return "\n".join(lines)
 
+    def has_unfinished(self) -> bool:
+        """判断清单中是否还有未完成的条目（子代理收工前自检用）"""
+        return any(todo["status"] != "completed" for todo in self.items)
 
-# 单例全局任务管理器
+    def summary(self) -> str:
+        """生成单行紧凑摘要供终端展示（完整清单仍作为工具结果返回给模型）"""
+        if not self.items:
+            return "empty"
+        done = sum(todo["status"] == "completed" for todo in self.items)
+        text = f"{done}/{len(self.items)} completed"
+        current = next(
+            (todo["content"] for todo in self.items
+             if todo["status"] == "in_progress"),
+            None,
+        )
+        if current:
+            # 进行中的条目过长时截断，保持摘要单行可读
+            if len(current) > 30:
+                current = current[:30] + "..."
+            text += f" | doing: {current}"
+        return text
+
+
+# 单例全局任务管理器（主代理使用）
 TODO = TodoManager()
+
+# 当前生效的任务管理器：子代理运行期间切换为它的私有清单，避免父子清单互相覆盖
+ACTIVE_TODO = TODO
 
 
 def run_todo_write(todos: list | str) -> str:
-    """todo_write 工具的回调实现，更新状态并在终端以黄色高亮打印当前任务状态"""
+    """todo_write 工具的回调实现：更新状态并在终端打印单行摘要，完整清单作为工具结果返回"""
     try:
-        output = TODO.update(todos)
+        output = ACTIVE_TODO.update(todos)
     except ValueError as e:
         return f"Error: {e}"
-    print(f"\n\033[33m## Current Tasks\033[0m\n{output}")
+    # 终端编码多为 GBK，日志只用 ASCII 前缀 + 颜色，避免 emoji 编码报错
+    print(f"\033[33m[TODO:{ACTIVE_TODO.label}] {ACTIVE_TODO.summary()}\033[0m")
     return output
