@@ -1,0 +1,1 @@
+Wrote 2408 bytes to ./small_galgame/route_ami.py

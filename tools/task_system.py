@@ -26,6 +26,7 @@ import json
 import os
 import re
 import secrets
+import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -36,6 +37,10 @@ WORKDIR = Path(os.getenv("WORK_DIR", Path.cwd()))
 TASKS_DIR = WORKDIR / ".tasks"
 # 任务 ID 命名规则：task_ 前缀 + 8 位十六进制随机串
 TASK_ID_PATTERN = re.compile(r"^task_[0-9a-f]{8}$")
+
+# 任务文件读写锁：主线程与团队成员线程（teammanager）会并发认领/完成任务，
+# 统一串行化对 .tasks/ 下任务文件的「读取-校验-写回」序列，防止同一任务被双认领
+TASK_LOCK = threading.RLock()
 
 
 @dataclass
@@ -48,6 +53,7 @@ class Task:
     status: str             # 任务状态：pending / in_progress / completed
     owner: str | None       # 认领者标识，未被认领时为 None
     blockedBy: list[str]    # 前置依赖任务的 ID 列表，全部完成前不可认领
+    worktree: str | None = None  # 任务绑定的 Git 工作树名（.worktrees/ 下），为空表示直接在工作区作业
 
 
 class TaskStore:
@@ -89,24 +95,25 @@ class TaskStore:
             raise ValueError("Task subject cannot be empty")
 
         self._root(create=True)
-        # 随机 ID 几乎不会重复；万一撞上就重新生成，最多尝试 100 次
-        for _ in range(100):
-            task = Task(
-                id=f"task_{secrets.token_hex(4)}",
-                subject=subject,
-                description=description,
-                status="pending",
-                owner=None,
-                blockedBy=[],
-            )
-            try:
-                with self._path(task.id, create_root=True).open(
-                    "x", encoding="utf-8"
-                ) as handle:
-                    json.dump(asdict(task), handle, indent=2)
-                return task
-            except FileExistsError:
-                continue
+        with TASK_LOCK:
+            # 随机 ID 几乎不会重复；万一撞上就重新生成，最多尝试 100 次
+            for _ in range(100):
+                task = Task(
+                    id=f"task_{secrets.token_hex(4)}",
+                    subject=subject,
+                    description=description,
+                    status="pending",
+                    owner=None,
+                    blockedBy=[],
+                )
+                try:
+                    with self._path(task.id, create_root=True).open(
+                        "x", encoding="utf-8"
+                    ) as handle:
+                        json.dump(asdict(task), handle, indent=2)
+                    return task
+                except FileExistsError:
+                    continue
         raise RuntimeError("Could not allocate a unique task ID")
 
     def _depends_on(self, task_id: str, target_id: str) -> bool:
@@ -130,61 +137,65 @@ class TaskStore:
         if not isinstance(add_blocked_by, list):
             raise ValueError("addBlockedBy must be a list of task IDs")
 
-        task = self.load(task_id)
-        # 依赖关系一旦开工/被认领就不允许再改，保证执行视图稳定
-        if task.status != "pending" or task.owner is not None:
-            raise ValueError(
-                f"Task {task_id} dependencies can only be updated while "
-                "pending and unowned"
-            )
-
-        # 去重并保持原有顺序
-        dependencies = list(dict.fromkeys(add_blocked_by))
-        for dependency in dependencies:
-            # 不允许自连接
-            if dependency == task_id:
-                raise ValueError("Task cannot depend on itself")
-            if not self.exists(dependency):
-                raise ValueError(f"Dependency not found: {dependency}")
-            # 若新依赖已经（间接）依赖当前任务，添加后会形成环，直接拒绝
-            if dependency not in task.blockedBy and self._depends_on(
-                dependency, task_id
-            ):
+        with TASK_LOCK:
+            task = self.load(task_id)
+            # 依赖关系一旦开工/被认领就不允许再改，保证执行视图稳定
+            if task.status != "pending" or task.owner is not None:
                 raise ValueError(
-                    f"Dependency cycle detected: {task_id} -> {dependency}"
+                    f"Task {task_id} dependencies can only be updated while "
+                    "pending and unowned"
                 )
 
-        task.blockedBy.extend(
-            dependency for dependency in dependencies
-            if dependency not in task.blockedBy
-        )
-        self.save(task)
-        return task
+            # 去重并保持原有顺序
+            dependencies = list(dict.fromkeys(add_blocked_by))
+            for dependency in dependencies:
+                # 不允许自连接
+                if dependency == task_id:
+                    raise ValueError("Task cannot depend on itself")
+                if not self.exists(dependency):
+                    raise ValueError(f"Dependency not found: {dependency}")
+                # 若新依赖已经（间接）依赖当前任务，添加后会形成环，直接拒绝
+                if dependency not in task.blockedBy and self._depends_on(
+                    dependency, task_id
+                ):
+                    raise ValueError(
+                        f"Dependency cycle detected: {task_id} -> {dependency}"
+                    )
+
+            task.blockedBy.extend(
+                dependency for dependency in dependencies
+                if dependency not in task.blockedBy
+            )
+            self.save(task)
+            return task
 
     def save(self, task: Task) -> None:
         """把任务全量写回对应的 JSON 文件"""
-        self._path(task.id, create_root=True).write_text(
-            json.dumps(asdict(task), indent=2),
-            encoding="utf-8",
-        )
+        with TASK_LOCK:
+            self._path(task.id, create_root=True).write_text(
+                json.dumps(asdict(task), indent=2),
+                encoding="utf-8",
+            )
 
     def load(self, task_id: str) -> Task:
         """读取任务文件并做字段校验（ID 匹配、状态合法）"""
-        data = json.loads(self._path(task_id).read_text(encoding="utf-8"))
-        task = Task(**data)
-        if task.id != task_id:
-            raise ValueError(f"Task file ID does not match {task_id}")
-        if task.status not in ("pending", "in_progress", "completed"):
-            raise ValueError(f"Invalid task status: {task.status}")
-        return task
+        with TASK_LOCK:
+            data = json.loads(self._path(task_id).read_text(encoding="utf-8"))
+            task = Task(**data)
+            if task.id != task_id:
+                raise ValueError(f"Task file ID does not match {task_id}")
+            if task.status not in ("pending", "in_progress", "completed"):
+                raise ValueError(f"Invalid task status: {task.status}")
+            return task
 
     def list(self) -> list[Task]:
         """按文件名排序返回全部任务（仓库目录不存在时返回空列表）"""
         if not self.directory.exists():
             return []
-        root = self._root()
-        return [self.load(path.stem)
-                for path in sorted(root.glob("task_*.json"))]
+        with TASK_LOCK:
+            root = self._root()
+            return [self.load(path.stem)
+                    for path in sorted(root.glob("task_*.json"))]
 
 
 # 全局单例任务仓库
@@ -241,52 +252,59 @@ def can_start(task_id: str) -> bool:
 
 def claim_task(task_id: str, owner: str = "agent") -> str:
     """认领任务：校验状态与依赖后置为 in_progress，并记录归属者"""
-    task = load_task(task_id)
-    if task.status != "pending":
-        return f"Task {task_id} is {task.status}, cannot claim"
-    # 前置依赖未全部完成时拒绝认领
-    dependencies = incomplete_dependencies(task)
-    if dependencies:
-        return f"Blocked by: {dependencies}"
-    task.owner = owner
-    task.status = "in_progress"
-    TASKS.save(task)
-    # 终端日志统一使用 [TASK:*] 品牌前缀 + 品红色，与黄色的 [TODO:*] 清单输出区分开
-    # （前缀只用 ASCII，避免 GBK 终端编码 emoji 报错）
-    print(f"\033[35m[TASK:claim] {task.id}: {task.subject} "
-          f"-> in_progress (owner: {owner})\033[0m")
-    return f"Claimed {task.id} ({task.subject})"
+    with TASK_LOCK:
+        task = load_task(task_id)
+        if task.status != "pending":
+            return f"Task {task_id} is {task.status}, cannot claim"
+        # 绑定了工作树的任务拥有专属工作目录，主代理固定在 WORKDIR 下作业落不到该目录，
+        # 此类任务只应由持有工作目录绑定的团队成员（teammanager）认领
+        if task.worktree and owner == "agent":
+            return (f"Task {task_id} is bound to worktree '{task.worktree}'; "
+                    "delegate it to a teammate")
+        # 前置依赖未全部完成时拒绝认领
+        dependencies = incomplete_dependencies(task)
+        if dependencies:
+            return f"Blocked by: {dependencies}"
+        task.owner = owner
+        task.status = "in_progress"
+        TASKS.save(task)
+        # 终端日志统一使用 [TASK:*] 品牌前缀 + 品红色，与黄色的 [TODO:*] 清单输出区分开
+        # （前缀只用 ASCII，避免 GBK 终端编码 emoji 报错）
+        print(f"\033[35m[TASK:claim] {task.id}: {task.subject} "
+              f"-> in_progress (owner: {owner})\033[0m")
+        return f"Claimed {task.id} ({task.subject})"
 
 
 def complete_task(task_id: str, owner: str = "agent") -> str:
     """完成任务：置为 completed，并提示因本次完成而新解锁的后续任务"""
-    task = load_task(task_id)
-    if task.status != "in_progress":
-        return f"Task {task_id} is {task.status}, cannot complete"
-    # 只有任务归属者本人才能完成任务
-    if task.owner != owner:
-        return f"Task {task_id} is owned by {task.owner}, not {owner}"
-    # 先记录完成前就已解锁的待办任务，稍后做差集找出新解锁的任务
-    ready_before = {
-        candidate.id
-        for candidate in list_tasks()
-        if candidate.status == "pending"
-        and candidate.blockedBy
-        and can_start(candidate.id)
-    }
-    task.status = "completed"
-    TASKS.save(task)
-    unblocked = [candidate.subject for candidate in list_tasks()
-                 if candidate.status == "pending"
-                 and candidate.blockedBy
-                 and candidate.id not in ready_before
-                 and can_start(candidate.id)]
-    print(f"\033[35m[TASK:done] {task.id}: {task.subject}\033[0m")
-    message = f"Completed {task.id} ({task.subject})"
-    if unblocked:
-        message += f"\nUnblocked: {', '.join(unblocked)}"
-        print(f"\033[35m[TASK:unblocked] {', '.join(unblocked)}\033[0m")
-    return message
+    with TASK_LOCK:
+        task = load_task(task_id)
+        if task.status != "in_progress":
+            return f"Task {task_id} is {task.status}, cannot complete"
+        # 只有任务归属者本人才能完成任务
+        if task.owner != owner:
+            return f"Task {task_id} is owned by {task.owner}, not {owner}"
+        # 先记录完成前就已解锁的待办任务，稍后做差集找出新解锁的任务
+        ready_before = {
+            candidate.id
+            for candidate in list_tasks()
+            if candidate.status == "pending"
+            and candidate.blockedBy
+            and can_start(candidate.id)
+        }
+        task.status = "completed"
+        TASKS.save(task)
+        unblocked = [candidate.subject for candidate in list_tasks()
+                     if candidate.status == "pending"
+                     and candidate.blockedBy
+                     and candidate.id not in ready_before
+                     and can_start(candidate.id)]
+        print(f"\033[35m[TASK:done] {task.id}: {task.subject}\033[0m")
+        message = f"Completed {task.id} ({task.subject})"
+        if unblocked:
+            message += f"\nUnblocked: {', '.join(unblocked)}"
+            print(f"\033[35m[TASK:unblocked] {', '.join(unblocked)}\033[0m")
+        return message
 
 
 # ==============================================================================

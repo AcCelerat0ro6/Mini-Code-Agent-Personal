@@ -1,0 +1,1 @@
+Wrote 1705 bytes to ./small_galgame/story_common.py

@@ -101,6 +101,9 @@ def _run_bash_process(command: str) -> tuple[str, int | None]:
             command,
             shell=True,
             cwd=WORKDIR,
+            # stdin 重定向到空设备：后台命令同样无人值守，不继承控制台键盘输入，
+            # 防止 date / pause 等交互式内建命令卡在提示上死等输入、拖满 120 秒超时
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True, errors="replace",
@@ -238,6 +241,11 @@ class BackgroundManager:
             print(f"\033[90m[background] collected {task_id}: {task['status']}\033[0m")
         return notifications
 
+    def has_ready(self) -> bool:
+        """判断是否有已完成、等待收割的任务（空闲唤醒线程据此唤起 Agent 循环）。"""
+        with self._lock:
+            return bool(self._ready)
+
     def running(self) -> list[str]:
         """返回仍在后台运行的任务 ID 列表，供收工前提醒模型别遗忘任务。"""
         with self._lock:
@@ -271,6 +279,11 @@ def collect_background_results() -> list[str]:
     return BACKGROUND.collect()
 
 
+def has_ready_background() -> bool:
+    """判断是否有已完成、等待收割的后台任务（空闲唤醒线程据此唤起 Agent 循环）。"""
+    return BACKGROUND.has_ready()
+
+
 def inject_background_results(messages: list) -> int:
     """
     把已完成后台任务的通知并入对话历史（上下文注入）：
@@ -297,3 +310,69 @@ def inject_background_results(messages: list) -> int:
         # 尾条是 assistant 消息：通知必须以 user 角色出现，另起一条消息
         messages.append({"role": "user", "content": blocks})
     return len(notifications)
+
+
+# ==============================================================================
+# 后台完成唤醒运行时（空闲投递线程）
+# ==============================================================================
+
+WAKE_STOP = threading.Event()   # 运行时停止事件：置位后唤醒线程退出
+_wake_thread: threading.Thread | None = None
+_wake_started = False
+_wake_lock = threading.Lock()
+
+
+def _background_wake_loop(stop_event: threading.Event, run_turn, agent_lock):
+    """
+    后台完成唤醒线程：有已就绪的后台结果且智能体空闲（拿到回合锁）时唤起一轮循环。
+    智能体正忙时结果留在就绪队列里排队，等其收工后再投递（与 cron / 团队唤醒
+    同一套约定）；进行中的回合也会在自己的循环开头收割结果，唤醒线程只兜底
+    「智能体空闲时后台命令才完成」的情况，避免结果无人认领。
+    """
+    while not stop_event.wait(0.2):
+        if not has_ready_background():
+            continue
+        if not agent_lock.acquire(blocking=False):
+            continue
+        try:
+            # 持锁后二次确认：避免拿锁期间结果已被上一轮注入消费完而空跑
+            if has_ready_background():
+                run_turn()
+        except Exception as exc:
+            # 唤醒回合失败不让线程死掉：结果仍在就绪队列，下轮继续投递
+            print(f"\033[33m[background] wake turn failed: "
+                  f"{type(exc).__name__}: {exc}\033[0m")
+        finally:
+            agent_lock.release()
+
+
+def start_background_wake_runtime(run_turn, agent_lock: threading.Lock):
+    """
+    启动后台完成唤醒运行时（幂等）。
+    run_turn 为空闲投递回调（由 main 注入），agent_lock 为智能体回合互斥锁。
+    """
+    global _wake_thread, _wake_started
+    with _wake_lock:
+        if _wake_started:
+            return
+        WAKE_STOP.clear()
+        _wake_thread = threading.Thread(
+            target=_background_wake_loop,
+            args=(WAKE_STOP, run_turn, agent_lock),
+            name="background-wake",
+            daemon=True,
+        )
+        _wake_thread.start()
+        _wake_started = True
+
+
+def stop_background_wake_runtime():
+    """停止后台完成唤醒线程（程序退出前调用，与 start_background_wake_runtime 配对）"""
+    global _wake_started
+    with _wake_lock:
+        if not _wake_started:
+            return
+        WAKE_STOP.set()
+        if _wake_thread is not None:
+            _wake_thread.join(timeout=1)
+        _wake_started = False

@@ -136,27 +136,32 @@ class GameEngine:
 
     # ── 存档 / 读档（JSON 文件） ─────────────────────────────────────
 
-    def save_state(self, state: dict, path: str = "save.json") -> None:
+    def save_state(self, state: dict, path: str = "save.json", quiet: bool = False) -> None:
         """
         将游戏状态（dict）保存为 JSON 文件。
         * state: 可序列化的字典。
         * path:  存档路径，默认当前目录 save.json。
+        * quiet: True 时不打印保存成功提示（用于自动存档）。
         """
         with open(path, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
-        print(f"{colorama.Fore.GREEN}✓ 已保存到 {path}{RST}")
+        if not quiet:
+            print(f"{colorama.Fore.GREEN}✓ 已保存到 {path}{RST}")
 
-    def load_state(self, path: str = "save.json") -> dict | None:
+    def load_state(self, path: str = "save.json", quiet: bool = False) -> dict | None:
         """
         从 JSON 文件加载游戏状态。
         * 文件不存在时返回 None 并提示。
+        * quiet: True 时不打印读取提示。
         """
         if not os.path.exists(path):
-            print(f"{colorama.Fore.RED}✗ 存档文件 {path} 不存在{RST}")
+            if not quiet:
+                print(f"{colorama.Fore.RED}✗ 存档文件 {path} 不存在{RST}")
             return None
         with open(path, "r", encoding="utf-8") as f:
             state = json.load(f)
-        print(f"{colorama.Fore.GREEN}✓ 已从 {path} 读取存档{RST}")
+        if not quiet:
+            print(f"{colorama.Fore.GREEN}✓ 已从 {path} 读取存档{RST}")
         return state
 
 

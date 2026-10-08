@@ -1,0 +1,19 @@
+total 48
+drwxrwxr-x    3 Accelerator Accelerator      4096 Oct 03 17:03 .
+drwxrwxr-x   17 Accelerator Accelerator      4096 Oct 03 14:59 ..
+drwxrwxr-x    2 Accelerator Accelerator         0 Sep 28 12:54 __pycache__
+-rw-rw-r--    1 Accelerator Accelerator      3471 Oct 03 17:02 core.py
+-rw-rw-r--    1 Accelerator Accelerator      8720 Oct 03 16:53 engine.py
+-rw-rw-r--    1 Accelerator Accelerator      3178 Oct 03 17:03 game.py
+-rw-rw-r--    1 Accelerator Accelerator      4029 Oct 03 17:03 route_amamiya.py
+-rw-rw-r--    1 Accelerator Accelerator      4001 Oct 03 17:03 route_ami.py
+-rw-rw-r--    1 Accelerator Accelerator      4549 Oct 03 17:03 route_yukiko.py
+-rw-rw-r--    1 Accelerator Accelerator      2844 Oct 03 17:03 story_common.py
+       83 ./small_galgame/core.py
+      205 ./small_galgame/engine.py
+       99 ./small_galgame/game.py
+      105 ./small_galgame/route_amamiya.py
+      103 ./small_galgame/route_ami.py
+      117 ./small_galgame/route_yukiko.py
+       75 ./small_galgame/story_common.py
+      787 total

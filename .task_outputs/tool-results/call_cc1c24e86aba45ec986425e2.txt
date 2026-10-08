@@ -1,0 +1,2 @@
+OK 12 ['amamiya_1', 'amamiya_2', 'amamiya_end', 'ami_1', 'ami_2', 'ami_end', 'choose_path', 'ending_summary', 'intro', 'yukiko_1', 'yukiko_2', 'yukiko_end']
+[0m

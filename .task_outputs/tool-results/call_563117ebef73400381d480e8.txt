@@ -1,0 +1,11 @@
+engine.py:139:    def save_state(self, state: dict, path: str = "save.json", quiet: bool = False) -> None:
+engine.py:151:    def load_state(self, path: str = "save.json", quiet: bool = False) -> dict | None:
+game.py:38:    def ending(self) -> str:
+game.py:40:        if self.affection >= 85 and flags.get("wished"):
+game.py:48:flags: dict[str, bool] = {}
+game.py:51:SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "save.json")
+game.py:119:    return "star_legend"
+game.py:143:def scene_star_legend():
+game.py:164:        flags["wished"] = True
+
+<reminder>Update your todos or task system.</reminder>

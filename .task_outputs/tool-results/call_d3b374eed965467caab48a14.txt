@@ -1,0 +1,6 @@
+./small_galgame\__pycache__
+./small_galgame\__pycache__\engine.cpython-310.pyc
+./small_galgame\__pycache__\engine.cpython-313.pyc
+./small_galgame\__pycache__\game.cpython-310.pyc
+./small_galgame\engine.py
+./small_galgame\game.py

@@ -1,0 +1,1 @@
+Wrote 2466 bytes to ./small_galgame/route_amamiya.py

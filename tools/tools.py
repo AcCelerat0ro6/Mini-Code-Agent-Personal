@@ -11,20 +11,23 @@ WORKDIR = os.getenv("WORK_DIR", Path.cwd())
 # ==============================================================================
 # 安全沙箱与四个文件操作工具
 # ==============================================================================
-def safe_path(p: str) -> Path:
+def safe_path(p: str, base: Path | None = None) -> Path:
     """
     路径安全校验函数：
-    解析输入路径并将其限制在工作空间 (WORKDIR) 内部，防御 '../' 等越权逃逸攻击。
+    解析输入路径并将其限制在基准目录（默认工作空间 WORKDIR）内部，
+    防御 '../' 等越权逃逸攻击。团队成员线程可传入任务绑定的工作目录作为基准。
     """
-    path = (WORKDIR / p).resolve()
-    # 检查目标真实路径是否以当前工作区目录为根
-    if not path.is_relative_to(WORKDIR):
+    root = (base or WORKDIR).resolve()
+    path = (root / p).resolve()
+    # 检查目标真实路径是否以基准目录为根
+    if not path.is_relative_to(root):
         raise ValueError(f"Path escapes workspace: {p}")
     return path
 
-def run_bash(command: str, run_in_background: bool = False) -> str:
+def run_bash(command: str, run_in_background: bool = False,
+             cwd: Path | None = None) -> str:
     """
-    在工作区目录下执行 Bash 命令，带有简易危险命令黑名单过滤。
+    在指定目录（默认工作区 WORKDIR）下执行 Bash 命令，带有简易危险命令黑名单过滤。
     run_in_background 是可选异步开关：真正的后台路由在 execute_tool 中完成，
     此处保留参数仅为兼容工具 schema 的完整入参（同步路径会忽略它）。
     """
@@ -34,7 +37,11 @@ def run_bash(command: str, run_in_background: bool = False) -> str:
         return "Error: Dangerous command blocked"
     try:
         # 执行命令，统一重定向错误流与输出流，设置 120 秒超时上限
-        r = subprocess.run(command, shell=True, cwd=WORKDIR,
+        # stdin 重定向到空设备：工具命令无人值守，绝不继承控制台键盘输入，
+        # 否则 Windows 内建命令（date / time / pause / choice 等）会卡在
+        # "Enter the new date:" 一类交互提示上死等输入（提示被捕获进管道，终端上毫无可见输出）
+        r = subprocess.run(command, shell=True, cwd=cwd or WORKDIR,
+                           stdin=subprocess.DEVNULL,
                            capture_output=True, text=True, errors="replace",
                            timeout=120)
         out = (r.stdout + r.stderr).strip()
@@ -45,10 +52,11 @@ def run_bash(command: str, run_in_background: bool = False) -> str:
     except (FileNotFoundError, OSError) as e:
         return f"Error: {e}"
 
-def run_read(path: str, limit: int | None = None) -> str:
-    """读取指定文件内容，支持限制返回行数以节省 token。"""
+def run_read(path: str, limit: int | None = None,
+             cwd: Path | None = None) -> str:
+    """读取指定文件内容（相对路径以 cwd 或工作区为基准），支持限制返回行数以节省 token。"""
     try:
-        lines = safe_path(path).read_text(encoding="utf-8").splitlines()
+        lines = safe_path(path, cwd).read_text(encoding="utf-8").splitlines()
         # 如果指定了行数限制且超限，截取前 limit 行并追加提示
         if limit and limit < len(lines):
             lines = lines[:limit] + [f"... ({len(lines) - limit} more lines)"]
@@ -56,23 +64,24 @@ def run_read(path: str, limit: int | None = None) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-def run_write(path: str, content: str) -> str:
-    """创建或全量覆盖写入文件内容（若父级目录不存在会自动递归创建）。"""
+def run_write(path: str, content: str, cwd: Path | None = None) -> str:
+    """创建或全量覆盖写入文件内容（相对路径以 cwd 或工作区为基准，父级目录不存在会自动递归创建）。"""
     try:
-        file_path = safe_path(path)
+        file_path = safe_path(path, cwd)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding="utf-8")
         return f"Wrote {len(content)} bytes to {path}"
     except Exception as e:
         return f"Error: {e}"
 
-def run_edit(path: str, old_text: str, new_text: str) -> str:
+def run_edit(path: str, old_text: str, new_text: str,
+             cwd: Path | None = None) -> str:
     """
-    精确单次替换文件中的指定字符串。
+    精确单次替换文件中的指定字符串（相对路径以 cwd 或工作区为基准）。
     相比全量重写文件，这种方式能显著降低大文件的 token 消耗与覆盖出错率。
     """
     try:
-        file_path = safe_path(path)
+        file_path = safe_path(path, cwd)
         text = file_path.read_text(encoding="utf-8")
         if old_text not in text:
             return f"Error: text not found in {path}"
@@ -82,15 +91,16 @@ def run_edit(path: str, old_text: str, new_text: str) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-def run_glob(pattern: str) -> str:
-    """在工作区内按 glob 通配符规则检索文件（支持 ** 跨目录递归搜索）。"""
+def run_glob(pattern: str, cwd: Path | None = None) -> str:
+    """在指定目录（默认工作区）内按 glob 通配符规则检索文件（支持 ** 跨目录递归搜索）。"""
     import glob as g
+    base = (cwd or WORKDIR).resolve()
     try:
-        # 检索文件，并确保每一个匹配到的路径都合法存在于 WORKDIR 内
+        # 检索文件，并确保每一个匹配到的路径都合法存在于基准目录内
         matches = sorted({
             match for match in g.glob(
-                pattern, root_dir=WORKDIR, recursive=True)
-            if (WORKDIR / match).resolve().is_relative_to(WORKDIR)
+                pattern, root_dir=base, recursive=True)
+            if (base / match).resolve().is_relative_to(base)
         })
         # 限制单次最大返回量，避免文件过多导致上下文溢出
         shown = matches[:200]
@@ -179,6 +189,20 @@ BASE_TOOLS = [
             }
         },
         "required": ["path", "old_text", "new_text"]
+    }
+},
+{
+    "name": "glob",
+    "description": "Find files by glob pattern; ** matches recursively.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "pattern": {
+                "type": "string",
+                "description": "The glob pattern to match files, e.g. 'src/**/*.py'."
+            }
+        },
+        "required": ["pattern"]
     }
 },
 {

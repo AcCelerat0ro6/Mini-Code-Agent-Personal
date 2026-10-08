@@ -9,6 +9,7 @@ from client.client import client
 from hooks.hook import  trigger_hooks
 from context.compactor import COMPACTOR
 from tools.backgroundmanager import inject_background_results
+from tools.recoverymanager import RecoveryState, with_retry
 
 WORKDIR = os.getenv("WORK_DIR", Path.cwd())
 MODEL = os.environ["MODEL_ID"]
@@ -72,6 +73,9 @@ def run_subagent(prompt: str) -> str:
     print("\n\033[35m[Subagent started]\033[0m")
     # 初始化子代理私有上下文
     messages = [{"role": "user", "content": prompt}]
+    # 错误恢复状态：子代理同样对 429/529 做退避重试与备模型切换
+    # （每个子代理独立计数，避免长任务被一次瞬时限流整个打断）
+    recovery = RecoveryState()
     # 子代理改用私有的 todo 清单，与主代理清单相互隔离，终端输出也互不混淆
     sub_todo = todomanager.TodoManager(label="sub")
     outer_todo = todomanager.ACTIVE_TODO
@@ -86,12 +90,15 @@ def run_subagent(prompt: str) -> str:
             # 可选异步上下文调用：收割子代理自己派发的后台任务结果并注入上下文
             inject_background_results(messages)
 
-            response = client.messages.create(
-                model=MODEL,
-                system=SUB_SYSTEM,
-                messages=messages,
-                tools=SUB_TOOLS,
-                max_tokens=8000,
+            response = with_retry(
+                lambda: client.messages.create(
+                    model=recovery.current_model,
+                    system=SUB_SYSTEM,
+                    messages=messages,
+                    tools=SUB_TOOLS,
+                    max_tokens=8000,
+                ),
+                recovery,
             )
             messages.append({"role": "assistant", "content": response.content})
 

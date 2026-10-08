@@ -1,0 +1,5 @@
+File "<string>", line 1, in <module>
+  File "G:\GoCode\LearnCCPersonal\small_galgame\game.py", line 49, in <module>
+    "ending_summary": scene_ending_summary,
+NameError: name 'scene_ending_summary' is not defined
+[0m

@@ -1,0 +1,75 @@
+"""
+学园祭前夜 ~Starlight Festival Eve~
+====================================
+基于 engine.py 的 CLI 微型 GalGame 演示
+运行方式: python game.py
+
+模块结构：
+* engine.py        —— 基础引擎（对话 / 选择 / 存档）
+* core.py          —— 角色数据、全局标记、辅助函数
+* story_common.py  —— 共通剧情：序幕 / 星降传说 / 岔路
+* route_yukiko.py  —— 小雪路线（3 幕 + True/Good/Normal 结局）
+* route_ami.py     —— 亚美路线（3 幕 + True/Good/Normal 结局）
+* route_amamiya.py —— 雨宫路线（3 幕 + True/Good/Normal 结局）
+* game.py          —— 场景路由与主循环
+
+True 结局需要好感 ≥ 85 且在共通剧情中参与「星降传说」的许愿。
+"""
+
+import story_common
+import route_yukiko
+import route_ami
+import route_amamiya
+
+from core import (
+    E, scene, narrate, choose, wait,
+    yukiko, ami, amamiya,
+)
+
+def scene_ending_summary():
+    """结局总结"""
+    scene("结局总结")
+    print("\n" + "=" * 42)
+    print("  本次旅程回顾")
+    print("=" * 42 + "\n")
+    for c in (yukiko, ami, amamiya):
+        e = c.ending()
+        if e == "true":
+            label = "★ True"
+        elif e == "good":
+            label = "♥ Good"
+        else:
+            label = "○ Normal"
+        print(f"  {c.name}: {label}  (好感度 {c.affection}/100)")
+    print()
+    narrate("感谢游玩本演示！")
+    print("  提示：参与「星降传说」的许愿且好感度 ≥ 85 可解锁 True 结局。")
+    print("  重新运行 python game.py，可以尝试不同的选择，攻略其他角色！")
+    print("=" * 42 + "\n")
+    wait("按 Enter 退出…")
+
+
+def main():
+    """主循环：通过场景字典与返回值驱动剧情流程"""
+    current = "intro"
+    visited = set()
+
+    try:
+        while current:
+            if current in visited:
+                print(f"[警告] 场景 '{current}' 重复触发，已终止以避免死循环。")
+                break
+            visited.add(current)
+
+            if current not in SCENES:
+                print(f"[错误] 未找到场景: {current}")
+                break
+
+            current = SCENES[current]()
+    except KeyboardInterrupt:
+        E.clear_screen()
+        print("\n感谢游玩，下次再见！\n")
+
+
+if __name__ == "__main__":
+    main()

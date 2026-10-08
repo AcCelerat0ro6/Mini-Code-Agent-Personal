@@ -1,0 +1,1 @@
+Wrote 2108 bytes to ./small_galgame/core.py

@@ -1,0 +1,117 @@
+"""
+route_yukiko.py —— 小雪路线
+====================================
+图书馆委员，内向文学少女。擅长倾听。
+True 结局需要好感 ≥ 85 且参与了星降传说的许愿（flags["wished"]）。
+"""
+
+from core import (
+    E, scene, narrate, dialogue, choose, wait,
+    affection_bar, yukiko, flags,
+)
+
+
+def scene_yukiko_1():
+    """小雪路线 第一幕：图书馆的相遇"""
+    scene("小雪 · 图书馆的相遇")
+    narrate(
+        "放学后，你来到图书馆还书。\n"
+        "空荡荡的阅览室里，只有一个扎着低马尾的女生在整理书架。"
+    )
+    narrate(
+        "她踮起脚尖去够最高一层的书，裙摆随着动作轻轻晃动。\n"
+        "那是图书馆委员——小雪。"
+    )
+    idx = choose([
+        "（默默上前，帮她把书取下来）",
+        "（安静地坐在位子上，假装什么都没看见）",
+    ])
+    if idx == 0:
+        narration = "你走到她身边，轻松地取下了那本《星夜手记》。"
+        narrate(narration)
+        dialogue("小雪", "啊……谢谢你。我、我够不到那一层……")
+        narrate("她的脸颊微微泛红，抱着书小声道谢。")
+        yukiko.change(+10)
+    else:
+        narrate("你挑了个靠窗的位置坐下，翻开自己的书，余光却不由自主地跟着她。")
+        dialogue("小雪", "（小声）……那本书，明明就在那么高的地方啊。")
+        narrate("她放弃地叹了口气，小声嘀咕的样子意外地可爱。")
+        yukiko.change(+3)
+    wait()
+    return "yukiko_2"
+
+
+def scene_yukiko_2():
+    """小雪路线 第二幕：雨天的伞"""
+    scene("小雪 · 雨天的伞")
+    narrate(
+        "几天后的傍晚，突然下起了大雨。\n"
+        "你站在走廊的屋檐下，看着雨幕发愁。"
+    )
+    narrate(
+        "这时，小雪撑着一把透明的雨伞走了过来。\n"
+        "她在你面前停下，有些紧张地把伞柄递向你。"
+    )
+    idx = choose([
+        "（接过伞，和她一起走）",
+        "（摇摇头，说雨很快就会停）",
+    ])
+    if idx == 0:
+        dialogue("小雪", "那个……如果不嫌弃的话，一起走吧？反正、反正顺路。")
+        narrate(
+            "透明的伞面上，雨滴敲出细密的鼓点。\n"
+            "你们肩并肩走在黄昏的街道上，谁都没有说话，\n"
+            "但空气里弥漫着一种安静的温暖。"
+        )
+        yukiko.change(+15)
+    else:
+        dialogue("小雪", "是、是吗……那我先走了。伞、伞就放在这里哦。")
+        narrate(
+            "她把伞轻轻靠在墙上，小跑着冲进了雨里。\n"
+            "望着她远去的背影，你心里泛起一丝说不出的后悔。"
+        )
+        yukiko.change(+5)
+    wait()
+    return "yukiko_3"
+
+
+def scene_yukiko_3():
+    """小雪路线 第三幕：星降祭当天（待扩写）"""
+    scene("小雪 · 星降祭当天")
+    narrate("（本幕内容将由后续扩写补全）")
+    wait()
+    return "yukiko_end"
+
+
+def scene_yukiko_end():
+    """小雪路线 结局：true / good / normal"""
+    ending = yukiko.ending()
+    scene("小雪 · 结局")
+    if ending == "true":
+        narrate(
+            "星降祭的夜晚，你们并肩站在操场的看台上。\n"
+            "漫天星辉洒落，像一场无声的雪。\n\n"
+            "「传说，是许下心愿的人创造的。」\n"
+            "小雪轻声说着，转过头看你。\n\n"
+            "——你笑了。\n\n"
+            "（★ True End：流星回应了彼此的心意。）"
+        )
+        yukiko.change(+5)
+    elif ending == "good":
+        narrate(
+            "星降祭的夜晚，你们并肩站在操场的看台上。\n"
+            "「谢谢你……今年的星降祭，我很开心。」\n"
+            "小雪的声音很轻，却在星空下格外清晰。\n\n"
+            "（★ Good End：一段温柔的开始。）"
+        )
+        yukiko.change(+3)
+    else:
+        narrate(
+            "星降祭结束了。\n"
+            "你和小雪的关系还停留在「认识」的程度。\n"
+            "也许，有些话只有在流星划过的瞬间才说得出口。\n\n"
+            "（○ Normal End：故事停在了最安静的一页。）"
+        )
+    affection_bar(yukiko)
+    wait("按 Enter 查看总结…")
+    return "ending_summary"

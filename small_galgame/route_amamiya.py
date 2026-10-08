@@ -1,0 +1,105 @@
+"""
+route_amamiya.py —— 雨宫路线
+====================================
+转学生，银发沉默却温柔。擅长倾听。
+True 结局需要好感 ≥ 85 且参与了星降传说的许愿（flags["wished"]）。
+"""
+
+from core import (
+    E, scene, narrate, dialogue, choose, wait,
+    affection_bar, amamiya, flags,
+)
+
+
+def scene_amamiya_1():
+    """雨宫路线 第一幕：转学生"""
+    scene("雨宫 · 转学生")
+    narrate(
+        "秋日的午后，教室门口站着一个陌生的身影。\n"
+        "银色的长发在阳光下微微发亮，那是转学生——雨宫。"
+    )
+    narrate(
+        "班主任让她做自我介绍，她却只是微微鞠了一躬，什么也没说。\n"
+        "全班的目光都落在她身上，她却只是安静地望着窗外。"
+    )
+    idx = choose([
+        "（主动搭话）",
+        "（保持沉默，不去打扰她）",
+    ])
+    if idx == 0:
+        dialogue("你", "那个……如果不介意的话，我可以带你熟悉一下学校。")
+        narrate("她转过头，灰色的眼睛里闪过一丝惊讶。")
+        dialogue("雨宫", "……谢谢你。我叫雨宫。")
+        narrate("她的声音很轻，像风吹过风铃。")
+        amamiya.change(+8)
+    else:
+        narrate("你决定不去打扰她，只是偶尔用余光注意着那个安静的背影。")
+        amamiya.change(+3)
+    wait()
+    return "amamiya_2"
+
+
+def scene_amamiya_2():
+    """雨宫路线 第二幕：屋顶的猫"""
+    scene("雨宫 · 屋顶的猫")
+    narrate(
+        "午休时间，你在教学楼的天台发现了一个熟悉的身影。\n"
+        "雨宫正蹲在角落里，轻轻地抚摸着一只三花猫。"
+    )
+    dialogue("雨宫", "……你也喜欢猫吗？")
+    idx = choose([
+        "（点头，在她身边蹲下）",
+        "（摇摇头，说自己只是路过）",
+    ])
+    if idx == 0:
+        narrate("你们并肩蹲在天台上，一起抚摸着那只慵懒的猫。")
+        dialogue("雨宫", "它叫『星子』。因为……它的眼睛，像星星一样。")
+        amamiya.change(+12)
+    else:
+        dialogue("雨宫", "是吗……那，打扰了。")
+        narrate("她低下头，继续抚摸着猫，背影显得有些孤单。")
+        amamiya.change(+3)
+    wait()
+    return "amamiya_3"
+
+
+def scene_amamiya_3():
+    """雨宫路线 第三幕：星降祭当天（待扩写）"""
+    scene("雨宫 · 星降祭当天")
+    narrate("（本幕内容将由后续扩写补全）")
+    wait()
+    return "amamiya_end"
+
+
+def scene_amamiya_end():
+    """雨宫路线 结局：true / good / normal"""
+    ending = amamiya.ending()
+    scene("雨宫 · 结局")
+    if ending == "true":
+        narrate(
+            "星降祭的夜晚，你们并肩站在操场的看台上。\n"
+            "漫天星辉洒落，像一场无声的雪。\n\n"
+            "「传说，看守星星的人，会把愿望带给流星。」\n"
+            "雨宫轻声说着，转过头看你。\n\n"
+            "——你笑了。\n\n"
+            "（★ True End：流星回应了彼此的心意。）"
+        )
+        amamiya.change(+5)
+    elif ending == "good":
+        narrate(
+            "星降祭的夜晚，你们并肩站在操场的看台上。\n"
+            "「谢谢你……今年的星降祭，我很开心。」\n"
+            "雨宫的声音很轻，却在星空下格外清晰。\n\n"
+            "（★ Good End：一段温柔的开始。）"
+        )
+        amamiya.change(+3)
+    else:
+        narrate(
+            "星降祭结束了。\n"
+            "你和雨宫的关系还停留在「认识」的程度。\n"
+            "也许，有些话只有在流星划过的瞬间才说得出口。\n\n"
+            "（○ Normal End：故事停在了最安静的一页。）"
+        )
+    affection_bar(amamiya)
+    wait("按 Enter 查看总结…")
+    return "ending_summary"
